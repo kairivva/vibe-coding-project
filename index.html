@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ContraWatch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0A0A0F;font-family:'Inter',sans-serif;color:#F0F0F8;min-height:100vh}
+input,textarea,button{font-family:'Inter',sans-serif}
+button{cursor:pointer}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@keyframes fadeSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.screen{animation:fadeSlideUp .4s ease forwards}
+.shake{animation:shake .4s ease}
+.slide-down{animation:slideDown .3s ease forwards}
+.spin-el{animation:spin 1s linear infinite;display:inline-block}
+.pulse-el{animation:pulse 1.2s ease infinite}
+.card{background:#13131A;border:1px solid #1E1E2E;border-radius:16px;transition:border-color .3s,box-shadow .3s;box-shadow:0 0 32px rgba(108,71,255,.07)}
+.card:hover{border-color:#6C47FF;box-shadow:0 0 40px rgba(108,71,255,.18)}
+.btn-primary{background:#6C47FF;color:#fff;border:none;border-radius:10px;padding:12px 24px;font-weight:600;font-size:15px;transition:filter .25s,box-shadow .25s}
+.btn-primary:hover:not(:disabled){filter:brightness(1.15);box-shadow:0 0 20px rgba(108,71,255,.4)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:transparent;color:#8888A8;border:1px solid #1E1E2E;border-radius:10px;padding:10px 20px;font-weight:500;font-size:14px;transition:border-color .25s,color .25s}
+.btn-ghost:hover{border-color:#6C47FF;color:#F0F0F8}
+.input-dark{background:#0A0A0F;border:1px solid #1E1E2E;border-radius:10px;padding:12px 16px;color:#F0F0F8;font-size:14px;width:100%;outline:none;transition:border-color .25s}
+.input-dark:focus{border-color:#6C47FF}
+.input-dark.error{border-color:#FF5C5C}
+.pill{display:inline-flex;align-items:center;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600}
+.pill-green{background:rgba(61,220,132,.15);color:#3DDC84}
+.pill-violet{background:rgba(108,71,255,.2);color:#A98FFF}
+.pill-grey{background:rgba(136,136,168,.15);color:#8888A8;font-weight:400}
+.pill-orange{background:rgba(255,160,60,.15);color:#FFAB4A}
+.pill-red{background:rgba(255,92,92,.15);color:#FF5C5C}
+.log-area{background:#0A0A0F;border:1px solid #1E1E2E;border-radius:12px;padding:16px;font-family:monospace;font-size:12px;color:#8888A8;max-height:160px;overflow-y:auto;margin-bottom:24px}
+.log-line{margin-bottom:4px;animation:fadeIn .3s ease}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#13131A}
+::-webkit-scrollbar-thumb{background:#1E1E2E;border-radius:2px}
+.hidden{display:none!important}
+.flex{display:flex}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-between{justify-content:space-between}.justify-end{justify-content:justify-end}.gap-8{gap:8px}.gap-10{gap:10px}.gap-12{gap:12px}.gap-16{gap:16px}.gap-24{gap:24px}.flex-1{flex:1}.flex-wrap{flex-wrap:wrap}
+.w-full{width:100%}.text-center{text-align:center}
+.mb-4{margin-bottom:4px}.mb-6{margin-bottom:6px}.mb-8{margin-bottom:8px}.mb-10{margin-bottom:10px}.mb-12{margin-bottom:12px}.mb-14{margin-bottom:14px}.mb-16{margin-bottom:16px}.mb-20{margin-bottom:20px}.mb-24{margin-bottom:24px}.mb-28{margin-bottom:28px}.mb-32{margin-bottom:32px}
+.mt-8{margin-top:8px}.mt-10{margin-top:10px}.mt-20{margin-top:20px}
+h2{font-size:28px;font-weight:700}
+</style>
+</head>
+<body>
+<div id="app" style="min-height:100vh;background:#0A0A0F;padding:0 16px">
+  <div id="wrap" style="max-width:720px;margin:0 auto;padding-top:40px;padding-bottom:60px"></div>
+  <div id="toast-container"></div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  screen: 1,
+  competitors: ['https://rival-agency.ru','https://topmarketing.io'],
+  key: 0
+};
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function isValidUrl(s){try{const u=new URL(s);return s.startsWith('http')}catch{return false}}
+
+function showToast(msg){
+  const t=document.getElementById('toast-container');
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#13131A;border:1px solid #1E1E2E;border-radius:10px;padding:12px 20px;z-index:1000;animation:toastIn .3s ease forwards;white-space:nowrap;color:#F0F0F8;font-size:14px;font-weight:500';
+  d.textContent=msg;
+  t.appendChild(d);
+  setTimeout(()=>d.remove(),2500);
+}
+
+function goTo(n){
+  state.screen=n; state.key++;
+  render();
+}
+
+// ── Header ─────────────────────────────────────────────────────────────────
+function mkHeader(stepLabel,onBack,badge){
+  const h=document.createElement('div');
+  h.className='flex items-center justify-between mb-28';
+  const left=document.createElement('div');
+  left.className='flex items-center gap-16';
+  if(onBack){
+    const b=document.createElement('button');
+    b.className='btn-ghost';
+    b.style.cssText='padding:6px 12px;font-size:13px';
+    b.textContent='← Назад';
+    b.onclick=onBack;
+    left.appendChild(b);
+  }
+  const logo=document.createElement('span');
+  logo.style.cssText='font-size:22px;font-weight:700;color:#F0F0F8';
+  logo.textContent='⚡ ContraWatch';
+  left.appendChild(logo);
+  const right=document.createElement('div');
+  right.className='flex items-center gap-10';
+  if(badge){
+    const bg=document.createElement('span');
+    bg.className='pill pill-green';
+    bg.style.fontSize='12px';
+    bg.textContent=badge;
+    right.appendChild(bg);
+  }
+  const sl=document.createElement('span');
+  sl.style.cssText='color:#8888A8;font-size:13px';
+  sl.textContent=stepLabel;
+  right.appendChild(sl);
+  h.appendChild(left); h.appendChild(right);
+  return h;
+}
+
+function mkProgressBar(step){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='height:3px;background:#1E1E2E;border-radius:2px;margin-bottom:32px';
+  const fill=document.createElement('div');
+  fill.style.cssText=`height:100%;background:#6C47FF;border-radius:2px;width:${(step/4)*100}%;transition:width .5s ease`;
+  wrap.appendChild(fill);
+  return wrap;
+}
+
+// ── Screen 1 ───────────────────────────────────────────────────────────────
+function renderScreen1(){
+  const el=document.createElement('div');
+  el.className='screen';
+  el.appendChild(mkHeader('Шаг 1 из 4 · Добавьте конкурентов'));
+  el.appendChild(mkProgressBar(1));
+
+  const title=document.createElement('div');
+  title.className='mb-24';
+  title.innerHTML='<h2 class="mb-8">Кого отслеживаем?</h2><p style="color:#8888A8;font-size:15px">Добавьте сайты конкурентов. Система будет проверять их ежедневно.</p>';
+  el.appendChild(title);
+
+  // Add form card
+  const card=document.createElement('div');
+  card.className='card mb-20';
+  card.style.padding='20px 24px';
+
+  const row=document.createElement('div');
+  row.className='flex gap-10';
+
+  const inp=document.createElement('input');
+  inp.className='input-dark';
+  inp.placeholder='https://competitor.com';
+
+  const errEl=document.createElement('p');
+  errEl.style.cssText='color:#FF5C5C;font-size:12px;margin-top:6px';
+  errEl.className='hidden';
+
+  const addBtn=document.createElement('button');
+  addBtn.className='btn-primary';
+  addBtn.style.cssText='white-space:nowrap;padding:12px 18px;font-size:14px';
+  addBtn.textContent='Добавить +';
+
+  function doAdd(){
+    const url=inp.value.trim();
+    if(state.competitors.length>=5){showToast('⛔ Максимум 5 конкурентов в базовом плане');return}
+    if(!isValidUrl(url)){
+      errEl.textContent='Введите корректный URL';
+      errEl.classList.remove('hidden');
+      inp.classList.add('error','shake');
+      setTimeout(()=>inp.classList.remove('shake'),400);
+      return;
+    }
+    if(state.competitors.includes(url)){
+      errEl.textContent='Этот URL уже добавлен';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    state.competitors.push(url);
+    inp.value='';
+    errEl.classList.add('hidden');
+    inp.classList.remove('error');
+    refreshList();
+    updateCounter();
+    updateBtn();
+  }
+
+  inp.addEventListener('keydown',e=>e.key==='Enter'&&doAdd());
+  inp.addEventListener('input',()=>{ errEl.classList.add('hidden'); inp.classList.remove('error'); });
+  addBtn.onclick=doAdd;
+
+  row.appendChild(inp); row.appendChild(addBtn);
+  card.appendChild(row); card.appendChild(errEl);
+  el.appendChild(card);
+
+  // List
+  const listEl=document.createElement('div');
+  listEl.className='flex flex-col gap-10 mb-16';
+  listEl.id='comp-list';
+
+  function renderCompetitorCard(c,i){
+    const ci=document.createElement('div');
+    ci.className='card slide-down';
+    ci.style.cssText='border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px';
+    ci.innerHTML=`<div style="background:rgba(108,71,255,.15);border-radius:8px;padding:6px 8px;font-size:16px">🌐</div>
+      <div style="flex:1;font-size:14px;font-weight:500">${c}</div>
+      <span class="pill pill-green">Активен</span>`;
+    const del=document.createElement('button');
+    del.style.cssText='background:none;border:none;color:#8888A8;font-size:16px;cursor:pointer;padding:0 4px;transition:color .2s';
+    del.textContent='✕';
+    del.onmouseenter=()=>del.style.color='#FF5C5C';
+    del.onmouseleave=()=>del.style.color='#8888A8';
+    del.onclick=()=>{ state.competitors.splice(i,1); refreshList(); updateCounter(); updateBtn(); };
+    ci.appendChild(del);
+    return ci;
+  }
+
+  function refreshList(){
+    listEl.innerHTML='';
+    state.competitors.forEach((c,i)=>listEl.appendChild(renderCompetitorCard(c,i)));
+  }
+  refreshList();
+  el.appendChild(listEl);
+
+  const counter=document.createElement('p');
+  counter.style.cssText='color:#8888A8;font-size:13px;margin-bottom:28px';
+  function updateCounter(){
+    counter.innerHTML=`Добавлено: <span style="color:#F0F0F8;font-weight:600">${state.competitors.length}</span> / 5 конкурентов`;
+  }
+  updateCounter();
+  el.appendChild(counter);
+
+  const bottom=document.createElement('div');
+  bottom.style.cssText='display:flex;justify-content:flex-end';
+  const nextBtn=document.createElement('button');
+  nextBtn.className='btn-primary';
+  nextBtn.style.cssText='padding:14px 32px;font-size:15px';
+  nextBtn.textContent='Настроить мониторинг →';
+  nextBtn.onclick=()=>goTo(2);
+  function updateBtn(){ nextBtn.disabled=state.competitors.length===0; }
+  updateBtn();
+  bottom.appendChild(nextBtn);
+  el.appendChild(bottom);
+
+  return el;
+}
+
+// ── Screen 2 ───────────────────────────────────────────────────────────────
+function renderScreen2(){
+  const el=document.createElement('div');
+  el.className='screen';
+  el.appendChild(mkHeader('Шаг 2 из 4 · Настройка',()=>goTo(1)));
+  el.appendChild(mkProgressBar(2));
+
+  const h=document.createElement('h2');
+  h.className='mb-28';
+  h.textContent='Как настроить мониторинг?';
+  el.appendChild(h);
+
+  // Card 1 – Frequency
+  let freq='Ежедневно';
+  const hints={'Ежедневно':'Проверка каждый день в 09:00','2 раза в неделю':'Проверка по вторникам и пятницам','Еженедельно':'Проверка каждый понедельник'};
+  const c1=document.createElement('div');
+  c1.className='card mb-14';
+  c1.style.padding='20px 24px';
+  c1.innerHTML='<div style="font-weight:600;margin-bottom:14px;font-size:15px">🕐 Частота проверки</div>';
+  const freqRow=document.createElement('div');
+  freqRow.className='flex gap-8 flex-wrap';
+  const hintEl=document.createElement('p');
+  hintEl.style.cssText='color:#8888A8;font-size:12px;margin-top:10px';
+  hintEl.textContent=hints[freq];
+  ['Ежедневно','2 раза в неделю','Еженедельно'].forEach(f=>{
+    const b=document.createElement('button');
+    b.style.cssText=`padding:8px 16px;border-radius:8px;font-size:13px;transition:all .2s;cursor:pointer`;
+    function upd(){
+      b.style.background=freq===f?'#6C47FF':'#13131A';
+      b.style.color=freq===f?'#F0F0F8':'#8888A8';
+      b.style.border=`1px solid ${freq===f?'#6C47FF':'#1E1E2E'}`;
+      b.style.fontWeight=freq===f?'600':'400';
+    }
+    upd();
+    b.textContent=f;
+    b.onclick=()=>{ freq=f; freqRow.querySelectorAll('button').forEach(x=>{ /* re-style all */ }); document.querySelectorAll('.freq-btn').forEach(x=>{
+      const ff=x.dataset.freq; x.style.background=freq===ff?'#6C47FF':'#13131A'; x.style.color=freq===ff?'#F0F0F8':'#8888A8'; x.style.border=`1px solid ${freq===ff?'#6C47FF':'#1E1E2E'}`; x.style.fontWeight=freq===ff?'600':'400';
+    }); hintEl.textContent=hints[freq]; };
+    b.className='freq-btn'; b.dataset.freq=f;
+    freqRow.appendChild(b);
+  });
+  c1.appendChild(freqRow); c1.appendChild(hintEl);
+  el.appendChild(c1);
+
+  // Card 2 – Notifications
+  let notif='Telegram';
+  const c2=document.createElement('div');
+  c2.className='card mb-14';
+  c2.style.padding='20px 24px';
+  c2.innerHTML='<div style="font-weight:600;margin-bottom:14px;font-size:15px">📲 Куда присылать отчёт</div>';
+  const notifRow=document.createElement('div');
+  notifRow.className='flex gap-10 mb-14';
+  const tgInput=document.createElement('input');
+  tgInput.className='input-dark';
+  tgInput.placeholder='@ваш_username или ID чата';
+  [{id:'Telegram',icon:'✈️'},{id:'Email',icon:'📧'}].forEach(n=>{
+    const nd=document.createElement('div');
+    nd.style.cssText=`flex:1;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:8px;cursor:${n.id==='Email'?'not-allowed':'pointer'};opacity:${n.id==='Email'?.45:1};transition:all .2s`;
+    function upd(){ nd.style.border=`1px solid ${notif===n.id?'#6C47FF':'#1E1E2E'}`; nd.style.background=notif===n.id?'rgba(108,71,255,.08)':'#13131A'; }
+    upd();
+    nd.innerHTML=`<span style="font-size:18px">${n.icon}</span><span style="font-weight:500;font-size:14px">${n.id}</span>`;
+    if(n.id==='Email'){const s=document.createElement('span');s.style.cssText='margin-left:auto;color:#8888A8;font-size:11px';s.textContent='Скоро';nd.appendChild(s);nd.title='Скоро';}
+    if(n.id==='Telegram'){const s=document.createElement('span');s.style.cssText='margin-left:auto;color:#6C47FF;font-size:12px';s.id='tg-check';s.textContent='✓';nd.appendChild(s);}
+    nd.onclick=()=>{
+      if(n.id==='Email') return;
+      notif=n.id;
+      notifRow.querySelectorAll('.notif-card').forEach(x=>{ x.style.border=`1px solid ${x.dataset.id===notif?'#6C47FF':'#1E1E2E'}`; x.style.background=x.dataset.id===notif?'rgba(108,71,255,.08)':'#13131A'; });
+      tgInput.style.display=notif==='Telegram'?'block':'none';
+    };
+    nd.className='notif-card'; nd.dataset.id=n.id;
+    notifRow.appendChild(nd);
+  });
+  c2.appendChild(notifRow); c2.appendChild(tgInput);
+  el.appendChild(c2);
+
+  // Card 3 – Brand
+  const c3=document.createElement('div');
+  c3.className='card mb-28';
+  c3.style.padding='20px 24px';
+  c3.innerHTML='<div style="font-weight:600;margin-bottom:4px;font-size:15px">🎯 Расскажите о вашей компании</div><p style="color:#8888A8;font-size:12px;margin-bottom:12px">AI будет учитывать ваш контекст при генерации идей</p>';
+  const ta=document.createElement('textarea');
+  ta.className='input-dark';
+  ta.rows=4;
+  ta.style.resize='vertical';
+  ta.placeholder='Пример: Маркетинговое агентство, работаем с B2B SaaS. Аудитория — маркетинг-директора компаний 50–500 человек.';
+  c3.appendChild(ta);
+  el.appendChild(c3);
+
+  const bottom=document.createElement('div');
+  bottom.style.cssText='display:flex;justify-content:flex-end';
+  const nb=document.createElement('button');
+  nb.className='btn-primary';
+  nb.style.cssText='padding:14px 32px;font-size:15px';
+  nb.textContent='Запустить мониторинг →';
+  nb.onclick=()=>goTo(3);
+  bottom.appendChild(nb);
+  el.appendChild(bottom);
+  return el;
+}
+
+// ── Screen 3 ───────────────────────────────────────────────────────────────
+function renderScreen3(){
+  const el=document.createElement('div');
+  el.className='screen';
+  el.appendChild(mkHeader('Шаг 3 из 4 · Система работает'));
+  el.appendChild(mkProgressBar(3));
+
+  const title=document.createElement('div');
+  title.className='mb-24';
+  title.innerHTML='<h2 class="mb-8">Проверяем конкурентов...</h2><p style="color:#8888A8;font-size:15px">Это займёт несколько секунд</p>';
+  el.appendChild(title);
+
+  const competitors=[...state.competitors];
+  const statuses=competitors.map(()=>0);
+  const results=competitors.map(()=>null);
+
+  const mainCard=document.createElement('div');
+  mainCard.className='card mb-20';
+  mainCard.style.padding='24px 28px';
+
+  const rows=competitors.map((url,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText=`display:flex;align-items:center;justify-content:space-between;padding:12px 0;${i<competitors.length-1?'border-bottom:1px solid #1E1E2E':''}`;
+    const urlEl=document.createElement('span');
+    urlEl.style.cssText='font-size:14px;font-weight:500';
+    urlEl.textContent=url.replace(/^https?:\/\//,'');
+    const statusEl=document.createElement('div');
+    statusEl.className='flex items-center gap-8';
+    row.appendChild(urlEl); row.appendChild(statusEl);
+    mainCard.appendChild(row);
+    return statusEl;
+  });
+
+  const progWrap=document.createElement('div');
+  progWrap.style.cssText='margin-top:20px;height:4px;background:#1E1E2E;border-radius:2px;overflow:hidden';
+  const progFill=document.createElement('div');
+  progFill.style.cssText='height:100%;background:#6C47FF;border-radius:2px;width:0%;transition:width .1s linear';
+  progWrap.appendChild(progFill);
+  mainCard.appendChild(progWrap);
+  el.appendChild(mainCard);
+
+  const logEl=document.createElement('div');
+  logEl.className='log-area';
+  el.appendChild(logEl);
+
+  const doneWrap=document.createElement('div');
+  doneWrap.className='text-center hidden';
+  doneWrap.style.animation='fadeIn .4s ease';
+  const doneBtn=document.createElement('button');
+  doneBtn.className='btn-primary mb-8';
+  doneBtn.style.cssText='padding:14px 36px;font-size:15px;margin-bottom:8px';
+  doneBtn.textContent='Смотреть отчёт →';
+  doneBtn.onclick=()=>goTo(4);
+  const cdEl=document.createElement('p');
+  cdEl.style.cssText='color:#8888A8;font-size:13px';
+  doneWrap.appendChild(doneBtn); doneWrap.appendChild(cdEl);
+  el.appendChild(doneWrap);
+
+  function addLog(line){
+    const d=document.createElement('div');
+    d.className='log-line';
+    d.textContent=line;
+    logEl.appendChild(d);
+    logEl.scrollTop=logEl.scrollHeight;
+  }
+
+  const stateColors=[['#8888A8','⏳ Ожидание...'],['#5B9BFF','🔄 Парсинг страницы...'],['#6C47FF','🧠 AI анализирует...'],['#3DDC84','✅ Готово']];
+
+  function updateStatus(i){
+    const s=statuses[i];
+    const [col,lbl]=stateColors[s];
+    const sEl=rows[i];
+    sEl.innerHTML='';
+    if(s===2){const sp=document.createElement('span');sp.className='spin-el';sp.style.fontSize='10px';sp.textContent='◌';sEl.appendChild(sp);}
+    const txt=document.createElement('span');
+    txt.style.cssText=`color:${col};font-size:13px`;
+    if(s===0) txt.className='pulse-el';
+    txt.textContent=lbl;
+    sEl.appendChild(txt);
+    if(s===3){
+      const pill=document.createElement('span');
+      pill.className='pill '+(results[i]?'pill-violet':'pill-grey');
+      pill.textContent=results[i]?'Найдены изменения':'Без изменений';
+      sEl.appendChild(pill);
+    }
+  }
+
+  const total=competitors.length;
+  const perComp=2500;
+  const startTime=Date.now();
+  const totalDur=1200*(total-1)+perComp+800;
+
+  addLog(`[09:00:01] Запуск проверки — ${total} конкурент${total===1?'':'а'}`);
+
+  competitors.forEach((url,i)=>{
+    setTimeout(()=>{
+      statuses[i]=1; updateStatus(i);
+      const short=url.replace(/^https?:\/\//,'');
+      addLog(`[09:00:0${2+i*2}] Подключение к ${short}...`);
+      setTimeout(()=>{
+        statuses[i]=2; updateStatus(i);
+        addLog(`[09:00:0${3+i*2}] Страница получена (${(1.5+Math.random()*2).toFixed(1)}KB)`);
+        setTimeout(()=>{
+          const changed=i===0||Math.random()>.5;
+          statuses[i]=3; results[i]=changed; updateStatus(i);
+          if(changed) addLog(`[09:00:0${4+i*2}] Обнаружены изменения в блоке /pricing`);
+          addLog(`[09:00:0${5+i*2}] Отправка в Claude AI для анализа...`);
+          if(i===total-1){
+            setTimeout(()=>{
+              addLog('[09:00:07] Анализ завершён');
+              addLog('[09:00:08] Отчёт готов ✓');
+              doneWrap.classList.remove('hidden');
+              let c=3; cdEl.textContent=`Открываю отчёт через ${c}...`;
+              const t=setInterval(()=>{ c--; if(c<=0){clearInterval(t);goTo(4)}else cdEl.textContent=`Открываю отчёт через ${c}...`; },1000);
+            },800);
+          }
+        },perComp*.6);
+      },perComp*.3);
+    },i*1200);
+  });
+
+  const iv=setInterval(()=>{
+    const el2=Date.now()-startTime;
+    progFill.style.width=Math.min(100,(el2/totalDur)*100)+'%';
+    if(el2>=totalDur) clearInterval(iv);
+  },50);
+
+  return el;
+}
+
+// ── Screen 4 ───────────────────────────────────────────────────────────────
+function renderScreen4(){
+  const el=document.createElement('div');
+  el.className='screen';
+  el.appendChild(mkHeader('Шаг 4 из 4 · Отчёт готов',null,'✅ Отправлено в Telegram'));
+  el.appendChild(mkProgressBar(4));
+
+  const today=new Date().toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'});
+  const c1=state.competitors[0]||'https://rival-agency.ru';
+  const short=c1.replace(/^https?:\/\//,'');
+
+  const title=document.createElement('div');
+  title.className='mb-24';
+  title.innerHTML=`<h2 class="mb-8">Отчёт по мониторингу</h2><p style="color:#8888A8;font-size:15px">${today} · 1 изменение обнаружено</p>`;
+  el.appendChild(title);
+
+  const reportCard=document.createElement('div');
+  reportCard.className='card mb-24';
+  reportCard.style.cssText='padding:0;overflow:hidden';
+
+  // Top bar
+  const topBar=document.createElement('div');
+  topBar.style.cssText='background:#1a1030;padding:14px 20px;display:flex;align-items:center;justify-content:space-between';
+  topBar.innerHTML=`<div style="display:flex;align-items:center;gap:10px">
+    <div style="width:32px;height:32px;border-radius:50%;background:#6C47FF;display:flex;align-items:center;justify-content:center;font-size:14px">⚡</div>
+    <div><div style="font-weight:700;font-size:14px">ContraWatch Bot</div><div style="color:#8888A8;font-size:11px">Telegram</div></div>
+  </div><span style="color:#8888A8;font-size:13px">09:08</span>`;
+  reportCard.appendChild(topBar);
+
+  const body=document.createElement('div');
+  body.style.padding='20px 24px';
+
+  // Competitor row
+  const compRow=document.createElement('div');
+  compRow.className='flex items-center flex-wrap gap-8 mb-20';
+  compRow.innerHTML=`<span style="background:rgba(108,71,255,.12);border:1px solid rgba(108,71,255,.3);border-radius:20px;padding:4px 12px;font-size:13px;display:inline-flex;align-items:center;gap:6px">🌐 ${short}</span>`;
+  const pill0=document.createElement('span');
+  pill0.className='pill pill-orange';
+  pill0.textContent='⚠️ Изменения найдены';
+  compRow.appendChild(pill0);
+  body.appendChild(compRow);
+
+  // What changed
+  const changed=document.createElement('div');
+  changed.className='mb-20';
+  changed.innerHTML=`<div style="color:#8888A8;font-size:11px;font-weight:700;letter-spacing:.08em;margin-bottom:8px">ЧТО ИЗМЕНИЛОСЬ</div>
+    <div style="background:#0A0A0F;border:1px solid #1E1E2E;border-radius:10px;padding:14px;font-size:14px;line-height:1.6">Обновлена страница /pricing. Добавлен новый тариф «Старт» за 990₽/мес. Переработан блок преимуществ — акцент на скорость внедрения. Убрано упоминание обязательного годового контракта.</div>`;
+  body.appendChild(changed);
+
+  // Summary
+  const summary=document.createElement('div');
+  summary.className='mb-20';
+  summary.innerHTML=`<div style="color:#8888A8;font-size:11px;font-weight:700;letter-spacing:.08em;margin-bottom:8px">📋 SUMMARY</div>
+    <p style="font-size:14px;line-height:1.7">Конкурент снижает порог входа: новый дешёвый тариф и отказ от жёстких условий контракта. Это сигнал о борьбе за новых клиентов в нижнем сегменте рынка.</p>`;
+  body.appendChild(summary);
+
+  // Tone + Topics
+  const meta=document.createElement('div');
+  meta.className='flex flex-wrap gap-24 mb-20';
+  meta.innerHTML=`<div><div style="color:#8888A8;font-size:11px;font-weight:700;letter-spacing:.08em;margin-bottom:8px">📊 ТОНАЛЬНОСТЬ</div><span class="pill pill-red">Агрессивная</span></div>
+    <div><div style="color:#8888A8;font-size:11px;font-weight:700;letter-spacing:.08em;margin-bottom:8px">🏷️ ТЕМЫ</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${['Ценообразование','Условия','Онбординг'].map(t=>`<span class="pill pill-grey">${t}</span>`).join('')}</div></div>`;
+  body.appendChild(meta);
+
+  // Ideas
+  const ideas=document.createElement('div');
+  ideas.innerHTML=`<div style="color:#6C47FF;font-size:11px;font-weight:700;letter-spacing:.08em;margin-bottom:12px">💡 ИДЕИ ДЛЯ ВАС</div>`;
+  ['Проверить собственное ценообразование — есть ли место для entry-level тарифа',
+   'Подготовить сравнительный контент: чем ваши условия выгоднее',
+   'Обновить страницу тарифов — убрать барьеры для первого шага клиента'].forEach(idea=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:10px;margin-bottom:10px;align-items:flex-start';
+    row.innerHTML=`<span style="color:#6C47FF;font-weight:700;font-size:16px;line-height:1.4">›</span><span style="font-size:14px;line-height:1.5">${idea}</span>`;
+    ideas.appendChild(row);
+  });
+  body.appendChild(ideas);
+  reportCard.appendChild(body);
+  el.appendChild(reportCard);
+
+  // Action buttons
+  const actions=document.createElement('div');
+  actions.className='flex flex-wrap gap-10 mb-32';
+
+  const rb=document.createElement('button');
+  rb.className='btn-primary';
+  rb.style.fontSize='14px';
+  rb.textContent='🔄 Запустить новую проверку';
+  rb.onclick=()=>{ state.competitors=['https://rival-agency.ru','https://topmarketing.io']; goTo(1); };
+
+  const cb=document.createElement('button');
+  cb.className='btn-ghost';
+  cb.style.fontSize='14px';
+  cb.textContent='📋 Скопировать отчёт';
+  cb.onclick=()=>{
+    const txt=`ContraWatch — Отчёт\n${today}\n\nКонкурент: ${c1}\n⚠️ Изменения найдены\n\nЧТО ИЗМЕНИЛОСЬ:\nОбновлена страница /pricing. Добавлен новый тариф «Старт» за 990₽/мес.\n\nSUMMARY:\nКонкурент снижает порог входа.\n\nИДЕИ:\n› Проверить ценообразование\n› Подготовить сравнительный контент\n› Обновить страницу тарифов`;
+    navigator.clipboard.writeText(txt).then(()=>showToast('✅ Скопировано'));
+  };
+
+  const ab=document.createElement('button');
+  ab.className='btn-ghost';
+  ab.style.fontSize='14px';
+  ab.textContent='➕ Добавить конкурента';
+  ab.onclick=()=>goTo(1);
+
+  actions.appendChild(rb); actions.appendChild(cb); actions.appendChild(ab);
+  el.appendChild(actions);
+
+  // Stats
+  const stats=document.createElement('div');
+  stats.className='flex flex-wrap gap-12';
+  [{val:state.competitors.length,label:'конкурента под контролем'},{val:'1',label:'изменение сегодня'},{val:'09:08',label:'время последней проверки'}].forEach(s=>{
+    const sc=document.createElement('div');
+    sc.className='card';
+    sc.style.cssText='flex:1;min-width:120px;padding:16px 20px;text-align:center';
+    sc.innerHTML=`<div style="font-size:24px;font-weight:700;color:#6C47FF;margin-bottom:4px">${s.val}</div><div style="font-size:12px;color:#8888A8">${s.label}</div>`;
+    stats.appendChild(sc);
+  });
+  el.appendChild(stats);
+  return el;
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render(){
+  const wrap=document.getElementById('wrap');
+  wrap.innerHTML='';
+  let screen;
+  if(state.screen===1) screen=renderScreen1();
+  else if(state.screen===2) screen=renderScreen2();
+  else if(state.screen===3) screen=renderScreen3();
+  else screen=renderScreen4();
+  wrap.appendChild(screen);
+}
+
+render();
+</script>
+</body>
+</html>
