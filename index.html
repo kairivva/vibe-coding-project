@@ -69,6 +69,8 @@ const state = {
 // ── Utils ──────────────────────────────────────────────────────────────────
 function isValidUrl(s){try{const u=new URL(s);return s.startsWith('http')}catch{return false}}
 
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
 function showToast(msg){
   const t=document.getElementById('toast-container');
   const d=document.createElement('div');
@@ -81,6 +83,17 @@ function showToast(msg){
 function goTo(n){
   state.screen=n; state.key++;
   render();
+}
+
+// ── Persistence ────────────────────────────────────────────────────────────
+function loadState(){
+  try{
+    const saved=localStorage.getItem('contrawatch_competitors');
+    if(saved){const parsed=JSON.parse(saved);if(Array.isArray(parsed)&&parsed.length)state.competitors=parsed;}
+  }catch(e){}
+}
+function saveState(){
+  try{localStorage.setItem('contrawatch_competitors',JSON.stringify(state.competitors));}catch(e){}
 }
 
 // ── Header ─────────────────────────────────────────────────────────────────
@@ -176,6 +189,7 @@ function renderScreen1(){
       return;
     }
     state.competitors.push(url);
+    saveState();
     inp.value='';
     errEl.classList.add('hidden');
     inp.classList.remove('error');
@@ -202,14 +216,14 @@ function renderScreen1(){
     ci.className='card slide-down';
     ci.style.cssText='border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px';
     ci.innerHTML=`<div style="background:rgba(108,71,255,.15);border-radius:8px;padding:6px 8px;font-size:16px">🌐</div>
-      <div style="flex:1;font-size:14px;font-weight:500">${c}</div>
+      <div style="flex:1;font-size:14px;font-weight:500">${escHtml(c)}</div>
       <span class="pill pill-green">Активен</span>`;
     const del=document.createElement('button');
     del.style.cssText='background:none;border:none;color:#8888A8;font-size:16px;cursor:pointer;padding:0 4px;transition:color .2s';
     del.textContent='✕';
     del.onmouseenter=()=>del.style.color='#FF5C5C';
     del.onmouseleave=()=>del.style.color='#8888A8';
-    del.onclick=()=>{ state.competitors.splice(i,1); refreshList(); updateCounter(); updateBtn(); };
+    del.onclick=()=>{ state.competitors.splice(i,1); saveState(); refreshList(); updateCounter(); updateBtn(); };
     ci.appendChild(del);
     return ci;
   }
@@ -561,7 +575,7 @@ function renderScreen4(){
   rb.className='btn-primary';
   rb.style.fontSize='14px';
   rb.textContent='🔄 Запустить новую проверку';
-  rb.onclick=()=>{ state.competitors=['https://rival-agency.ru','https://topmarketing.io']; goTo(1); };
+  rb.onclick=()=>goTo(1);
 
   const cb=document.createElement('button');
   cb.className='btn-ghost';
@@ -607,6 +621,7 @@ function render(){
   wrap.appendChild(screen);
 }
 
+loadState();
 render();
 </script>
 </body>
